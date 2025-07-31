@@ -1,0 +1,41 @@
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === Node/React ===
+node_modules/
+build/
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === Python/Flask ===
+__pycache__/
+*.pyc
+*.pyo
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+*.log
+
+# === Environment & secrets ===
+.env*
+!*.env.example
+
+# === VSCode & OS ===
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+
+# === Jupyter/Notebook ===
+.ipynb_checkpoints/
+
+
+# === Model ===
+models/
+models/*
