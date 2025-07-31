@@ -1,70 +1,66 @@
-# Getting Started with Create React App
+# Food Detection & Recipe App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Ứng dụng nhận diện nguyên liệu từ ảnh và gợi ý công thức món ăn Việt Nam bằng AI
 
-## Available Scripts
+## 1. Yêu cầu hệ thống
+- Python 3.8+
+- Node.js 16+
+- pip (Python package manager)
 
-In the project directory, you can run:
+## 2. Cài đặt Backend (Flask + YOLO + LM Studio)
 
-### `npm start`
+### Bước 1: Cài đặt Python packages
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+```bash
+pip install -r requirements.txt
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### Bước 2: Chuẩn bị mô hình YOLO
+- Đặt file mô hình YOLO đã train (`best.pt`) vào thư mục `models/` (tạo thư mục nếu chưa có).
+- Đảm bảo đường dẫn trong `main.py` là `./models/best.pt`.
 
-### `npm test`
+### Bước 3: Cài đặt và chạy LM Studio (hoặc OpenAI API local)
+- Tải và cài LM Studio: https://lmstudio.ai/
+- Chọn model hỗ trợ chat (ví dụ: Google Gemma, Llama, v.v.)
+- Chạy LM Studio ở chế độ API server (mặc định: http://localhost:1234/v1)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Bước 4: Chạy server Flask
 
-### `npm run build`
+```bash
+python main.py
+```
+- Server sẽ chạy tại: http://localhost:5000
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## 3. Cài đặt Frontend (React)
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Bước 1: Cài đặt dependencies
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```bash
+npm install
+```
 
-### `npm run eject`
+### Bước 2: Chạy ứng dụng React
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```bash
+npm start
+```
+- Ứng dụng sẽ chạy tại: http://localhost:3000
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## 4. Sử dụng
+- Upload ảnh nguyên liệu ở panel bên trái.
+- Nhấn "Tạo Công Thức Món Ăn" để nhận gợi ý công thức.
+- Có thể hỏi thêm về thời gian nấu, mẹo, khẩu phần, v.v. ở phần chat.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## 5. API Backend
+- `POST /detect`: Nhận diện nguyên liệu từ ảnh (multipart/form-data, key: `image`)
+- `GET /classes`: Lấy danh sách nguyên liệu mà model nhận diện được
+- `POST /generate-recipe`: Sinh công thức từ danh sách nguyên liệu (JSON: `{ "ingredients": ["...", ...] }`)
+- `POST /generate-questions`: Sinh câu hỏi thông minh về món ăn
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## 6. Lưu ý
+- Nếu gặp lỗi YOLO model, kiểm tra lại file `best.pt` và thư mục `models/`.
+- Nếu gặp lỗi LM Studio, kiểm tra LM Studio đã chạy ở chế độ API server chưa.
+- Có thể thay đổi model AI bằng cách đổi tên model trong `main.py`.
 
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## 7. Liên hệ & đóng góp
+- Mọi ý kiến đóng góp hoặc báo lỗi, vui lòng tạo issue hoặc liên hệ trực tiếp qua Github.
