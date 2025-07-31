@@ -13,10 +13,66 @@ CORS(app)
 
 # Config
 YOLO_MODEL_PATH = './models/best.pt'  # Đường dẫn đến model YOLO đã train
+model = "google/gemma-3-1b"  # Model LM Studio sử dụng
 client = OpenAI(
     base_url="http://localhost:1234/v1",
     api_key="lm-studio"  # Chỉ là chuỗi giả
 )
+
+# Ingredient translation mapping
+def datamap(ingredient):
+    """
+    Map English ingredient names to Vietnamese
+    """
+    translations = {
+        "carrot": "Cà rốt",
+        "chicken": "Thịt gà",
+        "tomato": "Cà chua",
+        "ginger": "Gừng",
+        "beans": "Đậu",
+        "banana": "Chuối",
+        "sponge_gourd": "Mướp hương",
+        "onion": "Hành tây",
+        "garlic": "Tỏi",
+        "bell_pepper": "Ớt chuông",
+        "egg": "Trứng",
+        "avocado": "Bơ",
+        "beet": "Củ dền",
+        "apple": "Táo",
+        "lemon": "Chanh vàng",
+        "broccoli": "Bông cải xanh",
+        "bitter_gourd": "Khổ qua",
+        "chillies": "Ớt",
+        "fish": "Cá",
+        "corn": "Bắp",
+        "okra": "Đậu bắp",
+        "eggplant": "Cà tím",
+        "beef": "Thịt bò",
+        "cucumber": "Dưa leo",
+        "potato": "Khoai tây",
+        "cabbage": "Bắp cải",
+        "cauliflower": "Súp lơ trắng",
+        "cheese": "Phô mai",
+        "shrimp": "Tôm",
+        "kimchi": "Kim chi",
+        "lettuce": "Xà lách",
+        "mushroom": "Nấm",
+        "sausage": "Xúc xích",
+        "coriander": "Rau mùi",
+        "pineapple": "Thơm",
+        "lime": "Chanh xanh",
+        "papaya": "Đu đủ",
+        "pork": "Thịt heo",
+        "dragon_fruit": "Thanh long",
+        "pumpkin": "Bí đỏ",
+        "pear": "Lê",
+        "guava": "Ổi",
+        "calabash": "Bầu",
+        "watermelon": "Dưa hấu",
+        "turmeric": "Nghệ"
+    }
+    
+    return translations.get(ingredient, ingredient)  # Trả về tên gốc nếu không tìm thấy
 
 # Load YOLO model
 print("🔄 Loading YOLO model...")
@@ -118,14 +174,30 @@ def detect_ingredients():
                 
                 # Sort theo confidence giảm dần
                 sorted_results = sorted(unique_ingredients.values(), key=lambda x: x['confidence'], reverse=True)
-                final_ingredients = [item['name'] for item in sorted_results]
                 
-                print(f"🎯 Final ingredients: {final_ingredients}")
+                # Translate ingredients to Vietnamese
+                final_ingredients = []
+                translated_results = []
+                
+                for item in sorted_results:
+                    english_name = item['name']
+                    vietnamese_name = datamap(english_name)
+                    
+                    final_ingredients.append(vietnamese_name)
+                    translated_results.append({
+                        'name': vietnamese_name,
+                        'english_name': english_name,
+                        'confidence': item['confidence'],
+                        'class_id': item['class_id']
+                    })
+                
+                print(f"🎯 Final ingredients (EN): {[item['name'] for item in sorted_results]}")
+                print(f"🎯 Final ingredients (VI): {final_ingredients}")
                 
                 return jsonify({
                     'success': True,
                     'ingredients': final_ingredients,
-                    'detailed_results': sorted_results,
+                    'detailed_results': translated_results,
                     'total_detected': len(final_ingredients)
                 })
                 
@@ -179,10 +251,25 @@ def get_classes():
             'success': False
         }), 500
     
+    # Get English classes and translate to Vietnamese
+    english_classes = list(yolo_model.names.values())
+    vietnamese_classes = [datamap(cls) for cls in english_classes]
+    
+    # Create mapping for reference
+    class_mapping = {}
+    for i, english_name in enumerate(english_classes):
+        vietnamese_name = datamap(english_name)
+        class_mapping[i] = {
+            'english': english_name,
+            'vietnamese': vietnamese_name
+        }
+    
     return jsonify({
         'success': True,
-        'classes': list(yolo_model.names.values()),
-        'total_classes': len(yolo_model.names)
+        'classes': vietnamese_classes,
+        'english_classes': english_classes,
+        'class_mapping': class_mapping,
+        'total_classes': len(english_classes)
     })
 
 # ==================== LM STUDIO RECIPE API ====================
@@ -231,13 +318,14 @@ Cách làm:
 ⏱️ Thời gian: [X phút] | 🌟 Độ khó: [Dễ/Trung bình/Khó]
 
 Lưu ý: Hướng dẫn phải rõ ràng, dễ hiểu, phù hợp với người Việt.
+Trả về định dạng text thường, không thêm các tag HTML hay Markdown.
 Khi người dùng hỏi về món ăn này, hãy trả lời bằng tiếng Việt và cung cấp công thức chi tiết.
 Nếu hỏi các câu hỏi ngoài lĩnh vực này, hãy trả lời rằng bạn chỉ chuyên về món ăn Việt Nam và không thể cung cấp thông tin khác."""
 
         try:
             print("🤖 Calling LM Studio API...")
             response = client.chat.completions.create(
-                model="google/gemma-3-1b",  # hoặc tên model bạn đã cấu hình cho LM Studio
+                model=model,
                 messages=[
                     {"role": "system", "content": "Bạn là đầu bếp chuyên nghiệp, chuyên món ăn Việt Nam. Trả lời bằng tiếng Việt."},
                     {"role": "user", "content": prompt}
@@ -318,13 +406,12 @@ Categories chỉ được phép: time, technique, portion, tips"""
         try:
             print("🤖 Generating smart questions...")
             response = client.chat.completions.create(
-                model="google/gemma-3-1b",
+                model=model,
                 messages=[
                     {"role": "system", "content": "Bạn là chuyên gia ẩm thực. Chỉ trả lời bằng JSON hợp lệ, không thêm text nào khác."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=600
             )
             
             content = response.choices[0].message.content.strip()
@@ -389,7 +476,7 @@ def health_check():
     lm_studio_status = "unknown"
     try:
         test_response = client.chat.completions.create(
-            model="google/gemma-3-1b",
+            model=model,
             messages=[{"role": "user", "content": "test"}],
             max_tokens=1,
             timeout=5

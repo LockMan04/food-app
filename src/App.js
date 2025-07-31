@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Upload, Send, Loader2, ChefHat, X, Edit3, Check, ChevronDown, ChevronUp, Clock, HelpCircle, Users, Flame } from 'lucide-react';
 import './App.css';
 
@@ -40,6 +40,7 @@ const FoodDetectionApp = () => {
     const data = await response.json();
     return data.ingredients;
   };
+
 
   // Recipe generation
   const generateRecipe = async (ingredients) => {
@@ -102,7 +103,13 @@ const FoodDetectionApp = () => {
   };
 
   const handleRemoveImage = (imageId) => {
-    setUploadedImages(prev => prev.filter(img => img.id !== imageId));
+    setUploadedImages(prev => {
+      const newImages = prev.filter(img => img.id !== imageId);
+      // Cập nhật lại allDetectedIngredients dựa trên các hình còn lại
+      const allIngredients = newImages.flatMap(img => img.ingredients || []);
+      setAllDetectedIngredients([...new Set(allIngredients)]);
+      return newImages;
+    });
   };
 
   const handleGenerateRecipe = async () => {
