@@ -1,5 +1,15 @@
 # Food Detection & Recipe App
 
+## Giới thiệu
+Food Detection & Recipe App là ứng dụng AI giúp nhận diện nguyên liệu từ ảnh và gợi ý công thức món ăn Việt Nam. Ứng dụng kết hợp mô hình YOLO để nhận diện hình ảnh và mô hình ngôn ngữ lớn để sinh công thức, mẹo nấu ăn, trả lời câu hỏi về món ăn.
+
+## Tính năng chính
+- Nhận diện nguyên liệu từ ảnh chụp.
+- Gợi ý công thức món ăn Việt Nam dựa trên nguyên liệu nhận diện được.
+- Chat hỏi đáp về món ăn: thời gian nấu, mẹo, khẩu phần, v.v.
+- Hỗ trợ thay đổi mô hình AI dễ dàng.
+- Giao diện web trực quan, dễ sử dụng.
+
 Ứng dụng nhận diện nguyên liệu từ ảnh và gợi ý công thức món ăn Việt Nam bằng AI
 
 ## 1. Yêu cầu hệ thống
@@ -18,6 +28,9 @@ pip install -r requirements.txt
 ### Bước 2: Chuẩn bị mô hình YOLO
 - Đặt file mô hình YOLO đã train (`best.pt`) vào thư mục `models/` (tạo thư mục nếu chưa có).
 - Đảm bảo đường dẫn trong `main.py` là `./models/best.pt`.
+
+> Tải xuống mô hình YOLOv11 đã fine-tune sẵn của tôi [best.pt](https://drive.google.com/uc?export=download&id=18FB3cotnpbXoBS-WSHhLJ4r1YmL_j5Kc
+)
 
 ### Bước 3: Cài đặt và chạy LM Studio (hoặc OpenAI API local)
 - Tải và cài LM Studio: https://lmstudio.ai/
