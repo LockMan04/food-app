@@ -12,10 +12,38 @@ const FoodDetectionApp = () => {
   const [editingIngredients, setEditingIngredients] = useState(false);
   const [tempIngredients, setTempIngredients] = useState([]);
   const [showChat, setShowChat] = useState(false);
-  const [quickQuestions, setQuickQuestions] = useState([]);
-  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+  const [isStreaming, setIsStreaming] = useState(false);
   const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
+
+  // Fixed common questions - không cần gọi API
+  const commonQuestions = [
+    {
+      text: "Thời gian nấu bao lâu?",
+      question: "Thời gian nấu món này mất bao lâu?",
+      category: "time",
+      icon: Clock
+    },
+    {
+      text: "Dùng lửa to hay nhỏ?",
+      question: "Nên dùng lửa to hay lửa nhỏ khi nấu?",
+      category: "technique",
+      icon: Flame
+    },
+    {
+      text: "Đủ cho mấy người?",
+      question: "Công thức này đủ cho bao nhiêu người ăn?",
+      category: "portion",
+      icon: Users
+    },
+    {
+      text: "Có mẹo gì đặc biệt?",
+      question: "Có mẹo nào để món ăn ngon hơn không?",
+      category: "tips",
+      icon: HelpCircle
+    }
+  ];
 
   // Scroll to bottom when chatMessages change
   useEffect(() => {
@@ -24,32 +52,193 @@ const FoodDetectionApp = () => {
     }
   }, [chatMessages, showChat]);
 
+  // Start chat session when recipe is ready
+  useEffect(() => {
+    if (currentRecipe && allDetectedIngredients.length && !sessionId) {
+      startChatSession();
+    }
+  }, [currentRecipe, allDetectedIngredients]);
+
   // YOLO detection
   const detectIngredients = async (imageFile) => {
-    const formData = new FormData();
-    formData.append('image', imageFile);
-    
-    const response = await fetch('http://localhost:5000/detect', {
-      method: 'POST', body: formData
-    });
-    
-    const data = await response.json();
-    return data.ingredients;
+    try {
+      const formData = new FormData();
+      formData.append('image', imageFile);
+      
+      const response = await fetch('http://localhost:5000/detect', {
+        method: 'POST', 
+        body: formData
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.ingredients) {
+        return data.ingredients;
+      } else {
+        console.error('Detection failed:', data.error);
+        return [];
+      }
+    } catch (error) {
+      console.error('Error in detectIngredients:', error);
+      return [];
+    }
   };
-
 
   // Recipe generation
   const generateRecipe = async (ingredients) => {
-  const response = await fetch('http://localhost:5000/generate-recipe', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ingredients})
-  });
-  
-  const data = await response.json();
-  return data.recipe;
-};
+    try {
+      const response = await fetch('http://localhost:5000/generate-recipe', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ingredients})
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.recipe) {
+        return data.recipe;
+      } else {
+        throw new Error(data.error || 'Failed to generate recipe');
+      }
+    } catch (error) {
+      console.error('Error in generateRecipe:', error);
+      throw error;
+    }
+  };
 
+  // Start chat session with context
+  const startChatSession = async () => {
+    if (!currentRecipe || !allDetectedIngredients.length) return;
+
+    try {
+      const response = await fetch('http://localhost:5000/start-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ingredients: allDetectedIngredients,
+          recipe: currentRecipe
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.session_id) {
+        setSessionId(data.session_id);
+        console.log('✅ Chat session started:', data.session_id);
+      } else {
+        console.error('Failed to start chat session:', data.error);
+      }
+    } catch (error) {
+      console.error('Error starting chat session:', error);
+    }
+  };
+
+  // Stream chat with context memory
+  const streamChatResponse = async (question) => {
+    if (!sessionId || !question.trim()) return;
+
+    const userMessage = {
+      type: 'user',
+      content: question,
+      timestamp: new Date()
+    };
+    
+    setChatMessages(prev => [...prev, userMessage]);
+    
+    // Add empty bot message for streaming
+    const botMessageIndex = chatMessages.length + 1;
+    setChatMessages(prev => [...prev, {
+      type: 'bot',
+      content: '',
+      timestamp: new Date(),
+      isComplete: false
+    }]);
+    
+    setIsStreaming(true);
+    
+    try {
+      const response = await fetch('http://localhost:5000/chat-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: sessionId,
+          question: question
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to start streaming');
+      }
+      
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        
+        // Process complete lines
+        for (let i = 0; i < lines.length - 1; i++) {
+          const line = lines[i].trim();
+          
+          if (line.startsWith('data: ')) {
+            try {
+              const jsonStr = line.slice(6); // Remove 'data: '
+              const data = JSON.parse(jsonStr);
+              
+              if (data.type === 'chunk' && data.content) {
+                // Update the bot message with new chunk
+                setChatMessages(prev => prev.map((msg, idx) => 
+                  idx === botMessageIndex
+                    ? { ...msg, content: msg.content + data.content }
+                    : msg
+                ));
+              } else if (data.type === 'done') {
+                // Mark message as complete
+                setChatMessages(prev => prev.map((msg, idx) => 
+                  idx === botMessageIndex
+                    ? { ...msg, isComplete: true }
+                    : msg
+                ));
+                setIsStreaming(false);
+                return;
+              } else if (data.type === 'error') {
+                throw new Error(data.error);
+              }
+            } catch (parseError) {
+              console.error('Failed to parse streaming data:', parseError);
+            }
+          }
+        }
+        
+        // Keep the last incomplete line in buffer
+        buffer = lines[lines.length - 1];
+      }
+      
+    } catch (error) {
+      console.error('Streaming error:', error);
+      
+      // Update with error message
+      setChatMessages(prev => prev.map((msg, idx) => 
+        idx === botMessageIndex
+          ? { 
+              ...msg, 
+              content: `Có lỗi khi kết nối server: ${error.message}`, 
+              isComplete: true,
+              isError: true 
+            }
+          : msg
+      ));
+      setIsStreaming(false);
+    }
+  };
+
+  // Handle image upload
   const handleImageUpload = async (files) => {
     const fileList = Array.from(files);
     
@@ -71,19 +260,29 @@ const FoodDetectionApp = () => {
         
         setUploadedImages(prev => [...prev, newImage]);
         
+        // Simulate processing delay then detect
         setTimeout(async () => {
-          const detected = await detectIngredients(file);
+          try {
+            const detected = await detectIngredients(file);
 
-          setUploadedImages(prev => prev.map(img =>
-            img.id === imageId
-              ? { ...img, detecting: false, ingredients: detected }
-              : img
-          ));
-          
-          setAllDetectedIngredients(prev => {
-            const combined = [...prev, ...detected];
-            return [...new Set(combined)];
-          });
+            setUploadedImages(prev => prev.map(img =>
+              img.id === imageId
+                ? { ...img, detecting: false, ingredients: detected }
+                : img
+            ));
+            
+            setAllDetectedIngredients(prev => {
+              const combined = [...prev, ...detected];
+              return [...new Set(combined)];
+            });
+          } catch (error) {
+            console.error('Detection error:', error);
+            setUploadedImages(prev => prev.map(img =>
+              img.id === imageId
+                ? { ...img, detecting: false, ingredients: [] }
+                : img
+            ));
+          }
         }, 1500);
       };
       
@@ -112,6 +311,19 @@ const FoodDetectionApp = () => {
     if (allDetectedIngredients.length === 0) return;
 
     setIsProcessing(true);
+    
+    // End existing session if any
+    if (sessionId) {
+      try {
+        await fetch(`http://localhost:5000/end-chat/${sessionId}`, {
+          method: 'DELETE'
+        });
+      } catch (error) {
+        console.error('Error ending previous session:', error);
+      }
+      setSessionId(null);
+    }
+
     try {
       const recipe = await generateRecipe(allDetectedIngredients);
       setCurrentRecipe(recipe);
@@ -120,129 +332,42 @@ const FoodDetectionApp = () => {
         content: 'Tôi đã tạo công thức món ăn từ nguyên liệu của bạn! Bạn có muốn hỏi thêm chi tiết gì không?',
         timestamp: new Date()
       }]);
-      // Không tự động show chat nữa
     } catch (error) {
       console.error('Error generating recipe:', error);
+      setChatMessages([{
+        type: 'bot',
+        content: 'Xin lỗi, có lỗi khi tạo công thức. Vui lòng thử lại sau.',
+        timestamp: new Date()
+      }]);
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // Handle manual chat input
   const handleSendChat = async () => {
-    if (!chatInput.trim() || !currentRecipe) return;
+    if (!chatInput.trim() || !sessionId || isStreaming) return;
 
-    const userMessage = {
-      type: 'user',
-      content: chatInput,
-      timestamp: new Date()
-    };
-
-    setChatMessages(prev => [...prev, userMessage]);
+    const question = chatInput;
     setChatInput('');
-    setIsProcessing(true);
-
-    try {
-      // Gửi câu hỏi lên backend (ví dụ: /generate-recipe hoặc endpoint trả lời câu hỏi nếu có)
-      const response = await fetch('http://localhost:5000/generate-recipe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ingredients: allDetectedIngredients,
-          question: chatInput
-        })
-      });
-      const data = await response.json();
-      let answer = '';
-      if (data.success && data.recipe) {
-        answer = data.recipe;
-      } else if (data.error) {
-        answer = data.error;
-      } else {
-        answer = 'Xin lỗi, tôi không thể trả lời câu hỏi này.';
-      }
-      setChatMessages(prev => [...prev, {
-        type: 'bot',
-        content: answer,
-        timestamp: new Date()
-      }]);
-    } catch (error) {
-      setChatMessages(prev => [...prev, {
-        type: 'bot',
-        content: 'Có lỗi khi kết nối server. Vui lòng thử lại.',
-        timestamp: new Date()
-      }]);
-    } finally {
-      setIsProcessing(false);
-    }
+    
+    await streamChatResponse(question);
   };
 
-  // Gọi API để lấy câu hỏi phổ biến
-  const fetchQuickQuestions = async () => {
-    if (!allDetectedIngredients.length || !currentRecipe) return;
-    setIsLoadingQuestions(true);
-    try {
-      const response = await fetch('http://localhost:5000/generate-questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ingredients: allDetectedIngredients,
-          recipe: currentRecipe
-        })
-      });
-      const data = await response.json();
-      if (data.success && Array.isArray(data.questions)) {
-        setQuickQuestions(data.questions);
-      }
-    } catch (e) {
-      setQuickQuestions([]);
-    } finally {
-      setIsLoadingQuestions(false);
-    }
-  };
-
-  // Khi có công thức mới, tự động lấy câu hỏi phổ biến
-  useEffect(() => {
-    if (currentRecipe && allDetectedIngredients.length) {
-      fetchQuickQuestions();
-    } else {
-      setQuickQuestions([]);
-    }
-    // eslint-disable-next-line
-  }, [currentRecipe, allDetectedIngredients]);
-
-  // Khi click vào câu hỏi phổ biến
-  const handleQuickQuestion = (questionObj) => {
-    if (!questionObj || !questionObj.question) return;
+  // Handle quick question click
+  const handleQuickQuestion = async (questionObj) => {
+    if (!questionObj || !questionObj.question || !sessionId || isStreaming) return;
+    
     setShowChat(true);
-    setChatInput(questionObj.question);
-    setTimeout(() => {
-      const userMessage = {
-        type: 'user',
-        content: questionObj.question,
-        timestamp: new Date()
-      };
-      setChatMessages(prev => [...prev, userMessage]);
-      setChatInput('');
-      setIsProcessing(true);
-      // Có thể tái sử dụng handleSendChat nếu muốn gửi lên backend
-      setTimeout(() => {
-        let response = '';
-        // Ở đây có thể gọi API trả lời nếu muốn, tạm giữ nguyên logic cũ
-        response = 'Câu hỏi hay đó! Dựa trên công thức hiện tại, tôi khuyên bạn nên chú ý đến độ chín của nguyên liệu.';
-        setChatMessages(prev => [...prev, {
-          type: 'bot',
-          content: response,
-          timestamp: new Date()
-        }]);
-        setIsProcessing(false);
-      }, 1000);
-    }, 100);
+    await streamChatResponse(questionObj.question);
   };
 
+  // Toggle chat visibility
   const toggleChat = () => {
     setShowChat(prev => !prev);
   };
 
+  // Ingredients editing functions
   const handleEditIngredients = () => {
     setTempIngredients([...allDetectedIngredients]);
     setEditingIngredients(true);
@@ -271,6 +396,17 @@ const FoodDetectionApp = () => {
     updated[index] = value;
     setTempIngredients(updated);
   };
+
+  // Cleanup session on unmount
+  useEffect(() => {
+    return () => {
+      if (sessionId) {
+        fetch(`http://localhost:5000/end-chat/${sessionId}`, {
+          method: 'DELETE'
+        }).catch(console.error);
+      }
+    };
+  }, [sessionId]);
 
   return (
     <div className="food-app">
@@ -320,6 +456,10 @@ const FoodDetectionApp = () => {
                     <div className="detecting">
                       <Loader2 size={16} className="loading-spinner" />
                       <span className="detecting-text">Đang phát hiện...</span>
+                    </div>
+                  ) : image.ingredients.length === 0 ? (
+                    <div className="ingredients-tags empty-ingredients">
+                      <span className="empty-ingredient-text">Không nhận diện được món nào</span>
                     </div>
                   ) : (
                     <div className="ingredients-tags">
@@ -483,30 +623,28 @@ const FoodDetectionApp = () => {
               <div className="recipe-text">{currentRecipe}</div>
             </div>
             
-            {/* Quick Questions Section */}
+            {/* Fixed Common Questions Section */}
             <div className="quick-questions">
               <h4 className="quick-questions-title">
                 <HelpCircle size={16} />
-                Câu hỏi phổ biến
+                Câu hỏi thường gặp
               </h4>
-            <div className="quick-questions-grid">
-              {isLoadingQuestions ? (
-                <div style={{ padding: '12px', color: '#888' }}>Đang tải câu hỏi...</div>
-              ) : quickQuestions.length ? (
-                quickQuestions.map((item, index) => (
-                  <button
-                    key={index}
-                    className="quick-question-btn"
-                    onClick={() => handleQuickQuestion(item)}
-                  >
-                    {/* Có thể dùng icon theo category nếu muốn */}
-                    {item.text}
-                  </button>
-                ))
-              ) : (
-                <div style={{ padding: '12px', color: '#888' }}>Không có câu hỏi phổ biến</div>
-              )}
-            </div>
+              <div className="quick-questions-grid">
+                {commonQuestions.map((item, index) => {
+                  const IconComponent = item.icon;
+                  return (
+                    <button
+                      key={index}
+                      className="quick-question-btn"
+                      onClick={() => handleQuickQuestion(item)}
+                      disabled={isStreaming || !sessionId}
+                    >
+                      <IconComponent size={14} className="question-icon" />
+                      {item.text}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </>
         ) : (
@@ -541,18 +679,16 @@ const FoodDetectionApp = () => {
             <div className={`chat-section ${showChat ? 'visible' : 'hidden'}`}>
               <div className="chat-messages">
                 {chatMessages.map((message, index) => (
-                  <div key={index} className={`message ${message.type}`}>
+                  <div key={index} className={`message ${message.type} ${message.isError ? 'error' : ''}`}>
                     <div className="message-content">
                       {message.content}
                     </div>
                   </div>
                 ))}
-                {isProcessing && (
-                  <div className="message bot">
-                    <div className="message-content">
-                      <Loader2 size={14} className="loading-spinner" style={{marginRight: '8px'}} />
-                      Đang trả lời...
-                    </div>
+                {isStreaming && (
+                  <div className="streaming-indicator">
+                    <Loader2 size={14} className="loading-spinner" style={{marginRight: '8px'}} />
+                    Đang trả lời...
                   </div>
                 )}
                 <div ref={chatEndRef} />
@@ -565,13 +701,13 @@ const FoodDetectionApp = () => {
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSendChat()}
-                    placeholder="Hỏi chi tiết về cách làm..."
+                    placeholder={isStreaming ? "Đang trả lời..." : "Hỏi chi tiết về cách làm..."}
                     className="text-input"
-                    disabled={isProcessing}
+                    disabled={isStreaming || !sessionId}
                   />
                   <button
                     onClick={handleSendChat}
-                    disabled={isProcessing || !chatInput.trim()}
+                    disabled={isStreaming || !chatInput.trim() || !sessionId}
                     className="send-btn"
                   >
                     <Send size={16} />

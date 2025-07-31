@@ -39,3 +39,5 @@ Thumbs.db
 # === Model ===
 models/
 models/*
+
+test.py
