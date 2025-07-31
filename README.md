@@ -77,3 +77,10 @@ npm start
 
 ## 7. Liên hệ & đóng góp
 - Mọi ý kiến đóng góp hoặc báo lỗi, vui lòng tạo issue hoặc liên hệ trực tiếp qua Github.
+
+## 8. Lời cảm ơn
+Cảm ơn sự tham gia nhiệt tình của các thành viên
+- Nguyễn Phạm Thái Bảo
+- Nguyễn Trần Vĩnh Khang
+- Dương Anh Kiệt
+- Phạm Ngọc Sơn
