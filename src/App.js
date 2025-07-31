@@ -12,12 +12,8 @@ const FoodDetectionApp = () => {
   const [editingIngredients, setEditingIngredients] = useState(false);
   const [tempIngredients, setTempIngredients] = useState([]);
   const [showChat, setShowChat] = useState(false);
-  const [quickQuestions] = useState([
-    { icon: Clock, text: "Thời gian nấu bao lâu?", question: "Thời gian nấu món này mất bao lâu?" },
-    { icon: Flame, text: "Nhiệt độ bao nhiêu?", question: "Nên dùng lửa to hay lửa nhỏ?" },
-    { icon: Users, text: "Đủ cho mấy người?", question: "Công thức này đủ cho bao nhiêu người ăn?" },
-    { icon: HelpCircle, text: "Mẹo nấu ngon?", question: "Có mẹo gì để món ăn ngon hơn không?" }
-  ]);
+  const [quickQuestions, setQuickQuestions] = useState([]);
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
   const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
 
@@ -145,63 +141,94 @@ const FoodDetectionApp = () => {
     setChatInput('');
     setIsProcessing(true);
 
-    setTimeout(() => {
-      let response = '';
-      const question = chatInput.toLowerCase();
-      
-      if (question.includes('thời gian') || question.includes('bao lâu')) {
-        response = 'Thời gian chuẩn bị khoảng 10 phút, nấu 15 phút. Tổng cộng khoảng 25 phút là xong nhé!';
-      } else if (question.includes('lửa') || question.includes('nhiệt độ')) {
-        response = 'Nên dùng lửa vừa khi xào thịt, lửa to khi đun sôi nước. Lưu ý đảo đều tay để không bị cháy!';
-      } else if (question.includes('người') || question.includes('khẩu phần')) {
-        response = 'Công thức này đủ cho 3-4 người ăn. Nếu muốn nhiều hơn thì nhân đôi nguyên liệu nhé!';
-      } else if (question.includes('mẹo') || question.includes('ngon')) {
-        response = 'Mẹo: ướp thịt kỹ trước khi nấu, rau củ không nên xào quá lâu để giữ độ giòn. Nêm nếm từ từ cho vừa miệng!';
+    try {
+      // Gửi câu hỏi lên backend (ví dụ: /generate-recipe hoặc endpoint trả lời câu hỏi nếu có)
+      const response = await fetch('http://localhost:5000/generate-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ingredients: allDetectedIngredients,
+          question: chatInput
+        })
+      });
+      const data = await response.json();
+      let answer = '';
+      if (data.success && data.recipe) {
+        answer = data.recipe;
+      } else if (data.error) {
+        answer = data.error;
       } else {
-        response = 'Câu hỏi hay đó! Dựa trên công thức hiện tại, tôi khuyên bạn nên chú ý đến độ chín của nguyên liệu.';
+        answer = 'Xin lỗi, tôi không thể trả lời câu hỏi này.';
       }
-
       setChatMessages(prev => [...prev, {
         type: 'bot',
-        content: response,
+        content: answer,
         timestamp: new Date()
       }]);
+    } catch (error) {
+      setChatMessages(prev => [...prev, {
+        type: 'bot',
+        content: 'Có lỗi khi kết nối server. Vui lòng thử lại.',
+        timestamp: new Date()
+      }]);
+    } finally {
       setIsProcessing(false);
-    }, 1000);
+    }
   };
 
-  const handleQuickQuestion = (questionText) => {
-    setShowChat(true); // Hiện chat khi chọn câu hỏi phổ biến
-    setChatInput(questionText);
-    // Auto send the question
+  // Gọi API để lấy câu hỏi phổ biến
+  const fetchQuickQuestions = async () => {
+    if (!allDetectedIngredients.length || !currentRecipe) return;
+    setIsLoadingQuestions(true);
+    try {
+      const response = await fetch('http://localhost:5000/generate-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ingredients: allDetectedIngredients,
+          recipe: currentRecipe
+        })
+      });
+      const data = await response.json();
+      if (data.success && Array.isArray(data.questions)) {
+        setQuickQuestions(data.questions);
+      }
+    } catch (e) {
+      setQuickQuestions([]);
+    } finally {
+      setIsLoadingQuestions(false);
+    }
+  };
+
+  // Khi có công thức mới, tự động lấy câu hỏi phổ biến
+  useEffect(() => {
+    if (currentRecipe && allDetectedIngredients.length) {
+      fetchQuickQuestions();
+    } else {
+      setQuickQuestions([]);
+    }
+    // eslint-disable-next-line
+  }, [currentRecipe, allDetectedIngredients]);
+
+  // Khi click vào câu hỏi phổ biến
+  const handleQuickQuestion = (questionObj) => {
+    if (!questionObj || !questionObj.question) return;
+    setShowChat(true);
+    setChatInput(questionObj.question);
     setTimeout(() => {
       const userMessage = {
         type: 'user',
-        content: questionText,
+        content: questionObj.question,
         timestamp: new Date()
       };
-
       setChatMessages(prev => [...prev, userMessage]);
       setChatInput('');
       setIsProcessing(true);
-
-      // Generate response based on question
+      // Có thể tái sử dụng handleSendChat nếu muốn gửi lên backend
       setTimeout(() => {
         let response = '';
-        const question = questionText.toLowerCase();
-        
-        if (question.includes('thời gian') || question.includes('bao lâu')) {
-          response = 'Thời gian chuẩn bị khoảng 10 phút, nấu 15 phút. Tổng cộng khoảng 25 phút là xong nhé!';
-        } else if (question.includes('lửa') || question.includes('nhiệt độ')) {
-          response = 'Nên dùng lửa vừa khi xào thịt, lửa to khi đun sôi nước. Lưu ý đảo đều tay để không bị cháy!';
-        } else if (question.includes('người') || question.includes('khẩu phần')) {
-          response = 'Công thức này đủ cho 3-4 người ăn. Nếu muốn nhiều hơn thì nhân đôi nguyên liệu nhé!';
-        } else if (question.includes('mẹo') || question.includes('ngon')) {
-          response = 'Mẹo: ướp thịt kỹ trước khi nấu, rau củ không nên xào quá lâu để giữ độ giòn. Nêm nếm từ từ cho vừa miệng!';
-        } else {
-          response = 'Câu hỏi hay đó! Dựa trên công thức hiện tại, tôi khuyên bạn nên chú ý đến độ chín của nguyên liệu.';
-        }
-
+        // Ở đây có thể gọi API trả lời nếu muốn, tạm giữ nguyên logic cũ
+        response = 'Câu hỏi hay đó! Dựa trên công thức hiện tại, tôi khuyên bạn nên chú ý đến độ chín của nguyên liệu.';
         setChatMessages(prev => [...prev, {
           type: 'bot',
           content: response,
@@ -462,18 +489,24 @@ const FoodDetectionApp = () => {
                 <HelpCircle size={16} />
                 Câu hỏi phổ biến
               </h4>
-              <div className="quick-questions-grid">
-                {quickQuestions.map((item, index) => (
+            <div className="quick-questions-grid">
+              {isLoadingQuestions ? (
+                <div style={{ padding: '12px', color: '#888' }}>Đang tải câu hỏi...</div>
+              ) : quickQuestions.length ? (
+                quickQuestions.map((item, index) => (
                   <button
                     key={index}
                     className="quick-question-btn"
-                    onClick={() => handleQuickQuestion(item.question)}
+                    onClick={() => handleQuickQuestion(item)}
                   >
-                    <item.icon size={14} className="question-icon" />
+                    {/* Có thể dùng icon theo category nếu muốn */}
                     {item.text}
                   </button>
-                ))}
-              </div>
+                ))
+              ) : (
+                <div style={{ padding: '12px', color: '#888' }}>Không có câu hỏi phổ biến</div>
+              )}
+            </div>
             </div>
           </>
         ) : (

@@ -13,7 +13,6 @@ CORS(app)
 
 # Config
 YOLO_MODEL_PATH = './models/best.pt'  # Đường dẫn đến model YOLO đã train
-model = "google/gemma-3-1b"  # Model LM Studio sử dụng
 client = OpenAI(
     base_url="http://localhost:1234/v1",
     api_key="lm-studio"  # Chỉ là chuỗi giả
@@ -25,51 +24,51 @@ def datamap(ingredient):
     Map English ingredient names to Vietnamese
     """
     translations = {
-        "carrot": "Cà rốt",
-        "chicken": "Thịt gà",
-        "tomato": "Cà chua",
-        "ginger": "Gừng",
-        "beans": "Đậu",
-        "banana": "Chuối",
-        "sponge_gourd": "Mướp hương",
-        "onion": "Hành tây",
-        "garlic": "Tỏi",
-        "bell_pepper": "Ớt chuông",
-        "egg": "Trứng",
-        "avocado": "Bơ",
-        "beet": "Củ dền",
-        "apple": "Táo",
-        "lemon": "Chanh vàng",
-        "broccoli": "Bông cải xanh",
-        "bitter_gourd": "Khổ qua",
-        "chillies": "Ớt",
-        "fish": "Cá",
-        "corn": "Bắp",
-        "okra": "Đậu bắp",
-        "eggplant": "Cà tím",
-        "beef": "Thịt bò",
-        "cucumber": "Dưa leo",
-        "potato": "Khoai tây",
-        "cabbage": "Bắp cải",
-        "cauliflower": "Súp lơ trắng",
-        "cheese": "Phô mai",
-        "shrimp": "Tôm",
-        "kimchi": "Kim chi",
-        "lettuce": "Xà lách",
-        "mushroom": "Nấm",
-        "sausage": "Xúc xích",
-        "coriander": "Rau mùi",
-        "pineapple": "Thơm",
-        "lime": "Chanh xanh",
-        "papaya": "Đu đủ",
-        "pork": "Thịt heo",
-        "dragon_fruit": "Thanh long",
-        "pumpkin": "Bí đỏ",
-        "pear": "Lê",
-        "guava": "Ổi",
-        "calabash": "Bầu",
-        "watermelon": "Dưa hấu",
-        "turmeric": "Nghệ"
+        "carrot": "cà rốt",
+        "chicken": "thịt gà",
+        "tomato": "cà chua",
+        "ginger": "gừng",
+        "beans": "đậu",
+        "banana": "chuối",
+        "sponge_gourd": "mướp hương",
+        "onion": "hành tây",
+        "garlic": "tỏi",
+        "bell_pepper": "ớt chuông",
+        "egg": "trứng",
+        "avocado": "bơ",
+        "beet": "củ dền",
+        "apple": "táo",
+        "lemon": "chanh vàng",
+        "broccoli": "bông cải xanh",
+        "bitter_gourd": "khổ qua (mướp đắng)",
+        "chillies": "ớt",
+        "fish": "cá",
+        "corn": "bắp",
+        "okra": "đậu bắp",
+        "eggplant": "cà tím",
+        "beef": "thịt bò",
+        "cucumber": "dưa leo",
+        "potato": "khoai tây",
+        "cabbage": "bắp cải",
+        "cauliflower": "súp lơ trắng",
+        "cheese": "phô mai",
+        "shrimp": "tôm",
+        "kimchi": "kim chi",
+        "lettuce": "xà lách",
+        "mushroom": "nấm",
+        "sausage": "xúc xích",
+        "coriander": "rau mùi (ngò)",
+        "pineapple": "thơm (dứa)",
+        "lime": "chanh xanh",
+        "papaya": "đu đủ",
+        "pork": "thịt heo",
+        "dragon_fruit": "thanh long",
+        "pumpkin": "bí đỏ",
+        "pear": "lê",
+        "guava": "ổi",
+        "calabash": "bầu",
+        "watermelon": "dưa hấu",
+        "turmeric": "nghệ"
     }
     
     return translations.get(ingredient, ingredient)  # Trả về tên gốc nếu không tìm thấy
@@ -318,14 +317,13 @@ Cách làm:
 ⏱️ Thời gian: [X phút] | 🌟 Độ khó: [Dễ/Trung bình/Khó]
 
 Lưu ý: Hướng dẫn phải rõ ràng, dễ hiểu, phù hợp với người Việt.
-Trả về định dạng text thường, không thêm các tag HTML hay Markdown.
 Khi người dùng hỏi về món ăn này, hãy trả lời bằng tiếng Việt và cung cấp công thức chi tiết.
 Nếu hỏi các câu hỏi ngoài lĩnh vực này, hãy trả lời rằng bạn chỉ chuyên về món ăn Việt Nam và không thể cung cấp thông tin khác."""
 
         try:
             print("🤖 Calling LM Studio API...")
             response = client.chat.completions.create(
-                model=model,
+                model="google/gemma-3-1b",  # hoặc tên model bạn đã cấu hình cho LM Studio
                 messages=[
                     {"role": "system", "content": "Bạn là đầu bếp chuyên nghiệp, chuyên món ăn Việt Nam. Trả lời bằng tiếng Việt."},
                     {"role": "user", "content": prompt}
@@ -406,12 +404,13 @@ Categories chỉ được phép: time, technique, portion, tips"""
         try:
             print("🤖 Generating smart questions...")
             response = client.chat.completions.create(
-                model=model,
+                model="google/gemma-3-1b",
                 messages=[
                     {"role": "system", "content": "Bạn là chuyên gia ẩm thực. Chỉ trả lời bằng JSON hợp lệ, không thêm text nào khác."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
+                max_tokens=600
             )
             
             content = response.choices[0].message.content.strip()
@@ -467,6 +466,56 @@ Categories chỉ được phép: time, technique, portion, tips"""
             'success': False
         }), 500
 
+        
+# ==================== FALLBACK QUESTIONS HELPER ====================
+def get_fallback_questions(ingredients):
+    """Câu hỏi mặc định"""
+    # Phân tích nguyên liệu
+    ingredients_str = ' '.join(ingredients).lower()
+    
+    questions = []
+    
+    if any(meat in ingredients_str for meat in ['thịt', 'bò', 'heo', 'gà']):
+        questions.append({
+            "text": "Làm sao thịt không dai?",
+            "question": "Có cách nào để thịt không bị dai khi nấu không?",
+            "category": "technique"
+        })
+    
+    if any(veg in ingredients_str for veg in ['rau', 'cà', 'củ']):
+        questions.append({
+            "text": "Rau giữ màu xanh?",
+            "question": "Làm thế nào để rau củ giữ được màu xanh tươi?",
+            "category": "technique"
+        })
+    
+    # Thêm câu hỏi chung
+    default_questions = [
+        {
+            "text": "Thời gian nấu bao lâu?",
+            "question": "Thời gian nấu món này mất bao lâu?",
+            "category": "time"
+        },
+        {
+            "text": "Đủ cho mấy người?",
+            "question": "Công thức này đủ cho bao nhiêu người ăn?",
+            "category": "portion"
+        },
+        {
+            "text": "Có mẹo gì đặc biệt?",
+            "question": "Có mẹo nào để món ăn ngon hơn không?",
+            "category": "tips"
+        },
+        {
+            "text": "Dùng lửa to hay nhỏ?",
+            "question": "Nên dùng lửa to hay lửa nhỏ khi nấu?",
+            "category": "technique"
+        }
+    ]
+    
+    all_questions = questions + default_questions
+    return all_questions[:4]
+
 # ==================== HEALTH & INFO ENDPOINTS ====================
 
 @app.route('/health', methods=['GET'])
@@ -476,7 +525,7 @@ def health_check():
     lm_studio_status = "unknown"
     try:
         test_response = client.chat.completions.create(
-            model=model,
+            model="google/gemma-3-1b",
             messages=[{"role": "user", "content": "test"}],
             max_tokens=1,
             timeout=5
@@ -495,6 +544,7 @@ def health_check():
             'GET /classes - Get YOLO classes',
             'POST /generate-recipe - Generate recipe',
             'POST /generate-questions - Generate smart questions',
+            'POST /answer-question - Answer cooking questions',
             'GET /health - Health check'
         ]
     })
@@ -517,6 +567,9 @@ def root():
             },
             'questions': {
                 'POST /generate-questions': 'Tạo câu hỏi thông minh'
+            },
+            'chat': {
+                'POST /answer-question': 'Trả lời câu hỏi về món ăn'
             },
             'info': {
                 'GET /health': 'Health check',
@@ -545,6 +598,7 @@ if __name__ == '__main__':
     print("  GET  /classes             - Get available classes")
     print("  POST /generate-recipe     - Generate recipe from ingredients")
     print("  POST /generate-questions  - Generate smart questions")
+    print("  POST /answer-question     - Answer cooking questions")
     print("  GET  /health              - Health check")
     print("  GET  /                    - API info")
     print("=" * 50)
